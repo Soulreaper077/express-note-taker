@@ -1,17 +1,96 @@
-const { application } = require('express');
+
 const express = require('express'); 
 const fs = require('fs');
 const path = require('path'); 
 const app = express(); 
-const uuid = require("./helpers/uuid"); 
+//const uuid = require("./helpers/uuid"); 
 const PORT = process.env.PORT || 3002; 
-
-const { notes }  = require('./db/db.json');
+const {notes} = require('./public/db/notes.json');
 
 // these 3 needed to pick up for the website 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static ('public'));
+////
+function filterByQuery(query, notesArray) {
+    let bodyArray = []; 
+    let noteResults = notesArray;
+    if (query.title) {
+        if (typeof query.title === 'string') {
+            bodyArray = [query.title];
+        } else {
+            bodyArray = query.title;
+        }
+        bodyArray.forEach(noteTitle => {
+            noteResults = noteResults.filter(
+                note => note.title.indexOf(noteTitle) !== -1
+            );
+        });
+    }
+    return noteResults; 
+}
+
+function findById(id, notesArray) {
+    const result = notesArray.filter(note => note.id === id)[0];
+    return result; 
+}
+
+function createNewNote(body, notesArray) {
+    const note = body;
+    notesArray.push(note);
+    fs.writeFileSync(
+        path.join(__dirname, './public/db/notes.json'), 
+        JSON.stringify({ notes: notesArray}, null, 2)
+    );
+    // function here 
+    return note; 
+}
+
+function validateNote(note) {
+    if(!note.title || typeof note.title !== 'string' ) {
+        return false;
+    }
+    if(!note.text || typeof note.text !== 'string') {
+        return false; 
+    }
+    return true; 
+}
+
+// API routes
+app.get('/api/notes', (req, res) => {
+    let results = notes;
+    if (req.query) {
+        results = filterByQuery(req.query, results);
+    } 
+    res.json(results);
+    console.info(`${req.method} request received for notes`)
+    // tst res.json(notes)
+});
+
+// get request for the new note 
+app.get('/api/notes/:id', (req, res) => {
+    const result = findById(req.params.id, notes);
+    if (result) {
+        res.json(result);
+        console.log(result);
+        console.info(`${req.method} request received for notes`)
+    } else {
+        res.send(404);
+    }
+});
+
+app.post('/api/notes', (req, res) => {
+    req.body.id = notes.length.toString();
+    // validation or whatnot
+    if(!validateNote(req.body)) {
+        res.status(400).send('The note is not properly formatted');
+    } else {
+        const note = createNewNote(req.body, notes);
+    res.json(note);  
+    console.log(note); 
+    console.info(`${req.method} request received for notes`)
+    }
+});
 
 // HTML routes
 app.get('/', function(req, res) {
@@ -20,73 +99,9 @@ app.get('/', function(req, res) {
 app.get('/notes', function(req, res) {
     res.sendFile(path.join(__dirname, './public/notes.html'));
 });
-
-// API routes
-app.get('/api/notes', (req, res) => {
-    res.json(notes)
-});
-
-// get request for the new note 
-app.get('/api/notes/:review_id', (req, res) => {
-    if(req.body && req.params.review_id) {
-        console.info(`${req.method} request received for the notes`);
-        const reviewId = req.params.review_id;
-        for (let i = 0; i < notes.length; i++) {
-            const currentNote = notes[i];
-            if (currentNote.review_id === reviewId) {
-                res.json(currentNote); 
-                return; 
-            }
-        }
-        res.json('note ID not found'); 
-    }
-});
-
-app.post('/api/notes', (req, res) => {
-    // log if the post request is received 
-    console.info(`${req.method} request received added `); 
-
-    // destructuring the note body 
-    const { title, text } = req.body; 
-
-    //if all the properties are present 
-    if (title && text) {
-        // var for the saved object 
-        const newNote = {
-            title,
-            text,
-            review_id: uuid(),
-        }; 
-
-        // convert the data into a string 
-        const noteString = JSON.stringify(newNote); 
-
-        fs.readFile('./db/db.json', "utf8", function (err, data) {
-            var json = JSON.parse(data)
-            console.log(" existing ", data)
-            json.push(newNote)
-    
-        fs.writeFile(`./db/db.json`, JSON.stringify(json), (err) => 
-        err
-        ? console.error(err)
-        : console.log(
-            `note for ${newNote.title} has been written to JSON`
-        )
-    ); 
-}) 
-
-    const response = {
-        status: 'success',
-        body: newNote,
-    };
-
-    console.log(response);
-    res.json(response);
-    } else {
-        res.json('Error in posting note')
-    }
-});
-
+app.get('*', (req,res) => {
+    res.sendFile(path.join(__dirname, './public/index.html')); 
+})
 
 app.listen(PORT, () => console.log(`server started on port ${PORT}`)); 
 
