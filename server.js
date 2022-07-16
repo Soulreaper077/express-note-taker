@@ -94,14 +94,14 @@ app.post('/api/notes', (req, res) => {
 
 // HTML routes
 app.get('/', function(req, res) {
-    res.sendFile(path.join(__dirname, './public/index.html'));
+    res.sendFile(path.join(__dirname, './public/index.html')); // index page 
 });
 app.get('/notes', function(req, res) {
-    res.sendFile(path.join(__dirname, './public/notes.html'));
+    res.sendFile(path.join(__dirname, './public/notes.html')); // notes page 
 });
 app.get('*', (req,res) => {
     res.sendFile(path.join(__dirname, './public/index.html')); 
 })
-
+// listen for the port number 
 app.listen(PORT, () => console.log(`server started on port ${PORT}`)); 
 
